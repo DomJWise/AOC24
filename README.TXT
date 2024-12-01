@@ -1,4 +1,4 @@
-NOTE: This is of no relevance or use except for the author, whose default ooRexx installation is (4.2), older than the minimum version (5.0) required for this work, and who does not have the ooRexx debugger installed in the system path
+NOTE: The contents of the Batch folder (and the comments below) are of no relevance or use except for the author, whose default ooRexx installation is (4.2), older than the minimum version (5.0) required for this work, and who does not have the ooRexx debugger installed in the system path. This is intended as a local README...
 
  - Run D:\dom\AOC24\Batch\setupenv to set up the environment 
 
