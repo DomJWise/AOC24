@@ -1445,4 +1445,4 @@ return controls[buttonid]~getText~changeStr("&", "")
 ::requires oodialog.cls
 ::requires winsystm.cls
 
-::options trace R
+--::options trace R
