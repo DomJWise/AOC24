@@ -84,7 +84,7 @@ if .local~rexxdebugger.commandlineisrexxdebugger then .local~rexxdebugger.debugg
 The core code of the debugging library follows below
 ====================================================*/
 
-::CONSTANT VERSION "1.32.1"
+::CONSTANT VERSION "1.32.5"
 
 --====================================================
 ::class RexxDebugger public
@@ -144,7 +144,7 @@ lastexecfulltime = 0
 uifinished = .True
 
 .local~debug.channel = .Directory~new
-.debug.channel~status="getprogramstatus"
+.debug.channel~status=.MutableBuffer~new("getprogramstatus", 256)
 .debug.channel~frames=.Nil
 .debug.channel~variables=.Nil
 .debug.channel~breakpointtestresult = .False
@@ -332,7 +332,7 @@ lastexecfulltime = TIME('F')
 if shutdown then return 'trace off; exit' 
 if launched = .false then return ''
 else response =self~GetAutoResponse
-if response \= "" | .debug.channel~status = "breakpointcheckgetlocation" then return response 
+if response \= "" | .debug.channel~status~string = "breakpointcheckgetlocation" then return response 
 
 response =  debuggerui~GetUINextResponse
 
@@ -344,21 +344,21 @@ if translate(response) = 'EXIT' then do
    
    end
 if translate(response) = 'RUN' then do
-  .debug.channel~status="breakpointcheckgetlocation"
+  .debug.channel~status~append("breakpointcheckgetlocation")
   return ''
 end  
-if word(translate(response), 1) = 'TRACE' then .debug.channel~status="getprogramstatus"
+if word(translate(response), 1) = 'TRACE' then .debug.channel~status~append("getprogramstatus")
 if translate(response) = 'NEXT' | response = '' then do
-  .debug.channel~status="getprogramstatus"
+  .debug.channel~status~append("getprogramstatus")
   return ''
 end  
 if translate(response)~word(1) = 'NEXT' & response~words > 1 then do
-   if "RUN EXIT HELP CAPTURE CAPTUREX NOCAPTURE"~wordpos(response~word(2)~translate) \= 0 then .debug.channel~status="getprogramstatus "||response~DELWORD(1,2)
-   else .debug.channel~status="getprogramstatus "||response~DELWORD(1,1)
+   if "RUN EXIT HELP CAPTURE CAPTUREX NOCAPTURE"~wordpos(response~word(2)~translate) \= 0 then .debug.channel~status~append("getprogramstatus "||response~DELWORD(1,2))
+   else .debug.channel~status~append("getprogramstatus "||response~DELWORD(1,1))
   return ''
 end  
 if translate(response) = 'UPDATEVARS' then do
-  .debug.channel~status="getvars"
+  .debug.channel~status~append("getvars")
   return 'NOP'
 end  
 if translate(response) = 'CAPTURE' | translate(response) = 'CAPTUREX' then do 
@@ -382,7 +382,7 @@ end
   
 if shutdown & response \= '' then response = response||'; trace off; exit'
 
-.debug.channel~status="getprogramstatus"
+.debug.channel~status~append("getprogramstatus")
 
 return response
 
@@ -391,21 +391,23 @@ return response
 ------------------------------------------------------
 expose debuggerui tracedprograms manualbreak breakpoints
 
-status = .debug.channel~status
+status = .debug.channel~status~string
+.debug.channel~status~delete -- No setText method in 4.2
+
 if status="breakpointcheckgetlocation" then do
-  .debug.channel~remove('RESULT')
-  return 'if Symbol(''RESULT'') = ''VAR'' THEN .debug.channel~result = RESULT; .debug.channel~status="breakpointchecklocationis ".context~package~name">".context~line; if .debug.channel~hasindex(''RESULT'') then result =.debug.channel~result; else DROP RESULT'
+  return '_rxd_temp_res = .debug.channel~status~append("breakpointchecklocationis ".context~package~name">".context~line);  drop _rxd_temp_res'
   end
 else if status~pos("breakpointchecklocationis") = 1 then do
   parse value status with ignore codelocation -- Is this a breakpoint ?
   if breakpoints~hasindex(codelocation) then do  
     test = breakpoints[codelocation]
-    if test = '' then do
-      .debug.channel~status="getprogramstatus"
+    if test = '' | manualbreak then do
+      manualbreak = .false
+      .debug.channel~status~append("getprogramstatus")
       return 'NOP'
     end  
     else do
-      .debug.channel~status="breakpointprocesstestresult" 
+      .debug.channel~status~append("breakpointprocesstestresult")
       .debug.channel~breakpointtestresult = .True
       .debug.channel~remove('RESULT')
       return 'if Symbol(''RESULT'') = ''VAR'' THEN .debug.channel~result = result; .debug.channel~breakpointtestresult = ('||test||'); if .debug.channel~hasindex(''RESULT'') then result =.debug.channel~result; else DROP RESULT'
@@ -413,17 +415,17 @@ else if status~pos("breakpointchecklocationis") = 1 then do
   end
   else if \tracedprograms~hasitem(codelocation~makearray('>')[1]) then do -- Break (first time time only) when hitting a new program which traces.
     tracedprograms~put(codelocation~makearray('>')[1])
-    .debug.channel~status="getprogramstatus"
+    .debug.channel~status~append("getprogramstatus")
     return 'NOP'
   end
   else if manualbreak then do -- Was a break issued from the dialog? 
     CALL SAY 'Automatic breakpoint hit.'
     manualbreak = .false
-    .debug.channel~status="getprogramstatus"
+    .debug.channel~status~append("getprogramstatus")
     return 'NOP'
   end
   else do       
-    .debug.channel~status = "breakpointcheckgetlocation"
+    .debug.channel~status~append("breakpointcheckgetlocation")
     return ''
   end  
 end  
@@ -431,11 +433,11 @@ else if status~pos("breakpointprocesstestresult") = 1 then do
   testresult = .debug.channel~breakpointtestresult
   .debug.channel~breakpointtestresult = .False
   if testresult = .True then do
-    .debug.channel~status="getprogramstatus"
+    .debug.channel~status~append("getprogramstatus")
     return 'NOP'
   end  
   else do
-    .debug.channel~status = "breakpointcheckgetlocation"
+    .debug.channel~status~append("breakpointcheckgetlocation")
     return ''
   end
 end
@@ -444,14 +446,14 @@ else if status~word(1)="getprogramstatus" then do
   if instructions \= '' then do 
     .debug.channel~frames= .nil
     .debug.channel~variables= .nil
-    .debug.channel~status="getprogramstatus"
+    .debug.channel~status~append("getprogramstatus")
     .debug.channel~remove('RESULT')
      return 'if Symbol(''RESULT'') = ''VAR'' THEN .debug.channel~result = result ;'instructions'; if .debug.channel~hasindex(''RESULT'') then result =.debug.channel~result; else DROP RESULT'
   end
   else do  
     .debug.channel~frames= .nil
     .debug.channel~variables= .nil
-    .debug.channel~status="programstatusupdated";
+    .debug.channel~status~append("programstatusupdated")
     .debug.channel~remove('RESULT')
     return 'if Symbol(''RESULT'') = ''VAR'' THEN .debug.channel~result = result ; .debug.channel~frames = .context~StackFrames~section(2); .debug.channel~variables=.context~variables;  if .debug.channel~hasindex(''RESULT'') then result =.debug.channel~result; else DROP RESULT'
   end  
@@ -459,20 +461,20 @@ end
 else if status="programstatusupdated" then do
   if .debug.channel~frames \=.nil then do
     frames = .debug.channel~frames
-    if .local~rexxdebugger.runroutine \=.nil then frames = frames~section(1, frames~items-3)
+    frames = frames~section(1, frames~items-3)
     tracedprograms~put(frames~firstitem~executable~package~name)
     debuggerui~UpdateUICodeView(frames, 1)
   end  
   if .debug.channel~variables \=.nil then debuggerui~UpdateUIWatchWindows(.debug.channel~variables)
   .debug.channel~frames= .nil
   .debug.channel~variables= .nil
-  .debug.channel~status=""
+  .debug.channel~status~append("")
   return ''
 end
 else if status="getvars" then do
   .debug.channel~frames= .nil
   .debug.channel~variables= .nil
-  .debug.channel~status="gotvars"
+  .debug.channel~status~append("gotvars")
   .debug.channel~remove('RESULT')
   return 'if Symbol(''RESULT'') = ''VAR'' THEN .debug.channel~result = result;.debug.channel~variables=.context~variables; if .debug.channel~hasindex(''RESULT'') then result =.debug.channel~result; else DROP RESULT'
 end     
@@ -480,7 +482,7 @@ else if status="gotvars" then do
   if .debug.channel~variables \=.nil then debuggerui~UpdateUIWatchWindows(.debug.channel~variables)
   .debug.channel~frames= .nil
   .debug.channel~variables= .nil
-  .debug.channel~status=""
+  .debug.channel~status~append("")
   return 'NOP'
 end
 return ''
@@ -532,16 +534,16 @@ return "ooRexx Debugger Version "||GetPackageConstant("Version")
 ------------------------------------------------------
 ::method OpenNewProgram unguarded
 ------------------------------------------------------
-expose debuggerui shutdown breakpoints tracedprograms canopensource
+expose debuggerui shutdown breakpoints tracedprograms canopensource traceoutputhandler
 
 use arg rexxfile,argstring,multipleargs = .False, firsttime = .False
 
 shutdown = .False
 breakpoints~empty
 tracedprograms~empty
-.debug.channel~status = "getprogramstatus"
-.local~rexxdebugger.runroutine = runroutine
-
+if traceoutputhandler \= .nil then traceoutputhandler~dononwrappedchecks = .False
+.debug.channel~status~delete 
+.debug.channel~status~append("getprogramstatus")
 runroutine = .nil
 strm = .stream~new(rexxfile)
 signal on ANY name HandleSyntaxError
@@ -751,6 +753,7 @@ debugger~SendDebugMessage(text)
 --====================================================
 ::class DebugTraceOutputHandler 
 --====================================================
+::attribute dononwrappedchecks unguarded
 
 ------------------------------------------------------
 ::method activate class
@@ -760,10 +763,12 @@ self~define("LINEOUT", .Method~new("", self~method("LINEOUT")~source)~~setUnguar
 ------------------------------------------------------
 ::method init
 ------------------------------------------------------
-expose debugger discard canusetraceobjects capture originaltraceoutput 
+expose debugger discard canusetraceobjects capture originaltraceoutput dononwrappedchecks
+
 use arg debugger
 discard = .False
 capture = .False
+dononwrappedchecks = .True
 
 originaltraceoutput = .traceoutput~current
 ign = .traceoutput~destination(self)
@@ -788,15 +793,15 @@ use arg discard
 ------------------------------------------------------
 ::method LINEOUT
 ------------------------------------------------------
-expose debugger discard canusetraceobjects capture originaltraceoutput
-use arg tracething
+expose debugger discard canusetraceobjects capture originaltraceoutput dononwrappedchecks
+use arg tracestring
 
 if \capture | debugger~isshutdown then forward to (originaltraceoutput)
 
-if canusetraceobjects, tracething~isA(.Traceobject) then tracestring = tracething~makestring
-else tracestring = tracething
+if canusetraceobjects then tracestring = tracestring~makestring
 
-if tracestring~word(1)~translate='ERROR' | tracestring~pos('+++ Interactive trace.  Error') = 1 | \discard then debugger~SendDebugMessage(tracestring)
+if \discard | tracestring~pos('+++ Interactive trace.  Error') = 1  then debugger~SendDebugMessage(tracestring)
+else if dononwrappedchecks , tracestring~pos('Error') = 1, tracestring~word(2)~strip('T',':')~datatype='NUM' then debugger~SendDebugMessage(tracestring)
 
 return 0
 
@@ -879,4 +884,5 @@ if itemclass =.Directory | -
   itemclass =.Array then return .True
 else return .False
 
+--::OPTIONS NOVALUE SYNTAX /* ooRexx 5+ only */
 --::options trace R
