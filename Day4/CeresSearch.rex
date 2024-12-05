@@ -1,8 +1,6 @@
 arrdata = LoadFileToArray('data.txt')
 height = arrData~items
 width = arrData[1]~length
-say height
-say width
 
 -- Part 1
 wordtoFind = 'XMAS'
@@ -21,20 +19,29 @@ do y = 1 to height
  end
  say 'Result for part 1 = 'total
 
--- Part 2 (something more general would be better but more work)
+-- Part 2
 total = 0
-do y = 2 to height - 1
-  do x = 2 to width - 1
-    if arrData[y]~subchar(x) = 'A' then do
-    if arrData[y-1]~subchar(x-1) = 'M' & arrData[y+1]~subchar(x+1) = 'S' | ,
-       arrData[y-1]~subchar(x-1) = 'S' & arrData[y+1]~subchar(x+1) = 'M' then 
-       if arrData[y-1]~subchar(x+1) = 'M' & arrData[y+1]~subchar(x-1) = 'S' | ,
-          arrData[y-1]~subchar(x+1) = 'S' & arrData[y+1]~subchar(x-1) = 'M' then total += 1
-    end      
+word = 'MAS'
+xextent = word~length
+distancetomiddle = (xextent - 1) / 2
+centerletter = word~subchar(distancetomiddle + 1)
+nop
+
+do y = 1 + distancetomiddle to height - distancetomiddle
+  do x = 1 + distancetomiddle to width - distancetomiddle
+    if arrData[y]~subchar(x) = centerletter then do
+      word1 = ''
+      word2 = ''
+      do i = - distancetomiddle to distancetomiddle
+        word1 = word1||arrData[y +i]~subchar(x + i)
+        word2 = word2||arrData[y + i]~subchar(x - i)
+      end
+      if (word1=word | word1 = word~reverse) &  (word2=word | word2 = word~reverse) then total += 1
+    end  
    end
  end
-say 'Result for part 1 = 'total
-
+ 
+say 'Result for part 2 = 'total
 
  ::routine FindWord
  use arg arrdata, x, y, dx, dy, width, height, wordtofind
