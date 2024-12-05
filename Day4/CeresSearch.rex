@@ -7,14 +7,11 @@ wordtoFind = 'XMAS'
 total = 0
 do y = 1 to height
   do x = 1 to width
-     total += FindWord(arrData,x,y,  1, 0,width, height, wordtofind)
-     total += FindWord(arrData,x,y,  1, 1,width, height, wordtofind)
-     total += FindWord(arrData,x,y,  0, 1,width, height, wordtofind)
-     total += FindWord(arrData,x,y, -1, 1,width, height, wordtofind)
-     total += FindWord(arrData,x,y, -1, 0,width, height, wordtofind)
-     total += FindWord(arrData,x,y, -1,-1,width, height, wordtofind)
-     total += FindWord(arrData,x,y,  0,-1,width, height, wordtofind)
-     total += FindWord(arrData,x,y,  1,-1,width, height, wordtofind)
+    do dx = -1 to 1
+      do dy = -1 to 1
+        if dx \= 0 | dy \= 0 then total += FindWord(arrData,x,y,  dx, dy,width, height, wordtofind)
+      end 
+    end
    end
  end
  say 'Result for part 1 = 'total
@@ -33,7 +30,7 @@ do y = 1 + distancetomiddle to height - distancetomiddle
       word1 = ''
       word2 = ''
       do i = - distancetomiddle to distancetomiddle
-        word1 = word1||arrData[y +i]~subchar(x + i)
+        word1 = word1||arrData[y + i]~subchar(x + i)
         word2 = word2||arrData[y + i]~subchar(x - i)
       end
       if (word1=word | word1 = word~reverse) &  (word2=word | word2 = word~reverse) then total += 1
