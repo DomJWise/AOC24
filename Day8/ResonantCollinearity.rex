@@ -48,8 +48,8 @@ do with item symbolpoints over symbols
           gradient = diff~y /diff~x
           intercept = (referencepoint~y + otherpoint~y - gradient * (referencepoint~x + otherpoint~x)) / 2
           do x = 1 to width
-            y = gradient * x + intercept
-            if y~round >=1 & y~round <= height & abs(y~round - y) < 0.0001 then do 
+            y = ((gradient * x + intercept) * 1000) ~round / 1000 -- Safely round to 3dp
+            if y >=1 & y <= height & y = y~round then do 
                newantinode =.Point~new(x,y~round)~makestring
                antinodes2[]=newantinode~makestring
             end
