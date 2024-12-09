@@ -84,7 +84,7 @@ if .local~rexxdebugger.commandlineisrexxdebugger then .local~rexxdebugger.debugg
 The core code of the debugging library follows below
 ====================================================*/
 
-::CONSTANT VERSION "1.32.5"
+::CONSTANT VERSION "1.32.9"
 
 --====================================================
 ::class RexxDebugger public
@@ -94,6 +94,8 @@ The core code of the debugging library follows below
 ::attribute canopensource unguarded
 ::attribute debuggerui unguarded
 ::attribute lastexecfulltime unguarded
+
+::constant DebugMsgPrefix '<-> '
 
 ------------------------------------------------------
 ::method activate class
@@ -127,7 +129,7 @@ uiFinished = .True
 ------------------------------------------------------
 ::method init 
 ------------------------------------------------------
-expose  shutdown launched  breakpoints tracedprograms manualbreak windowname offsetdirection traceoutputhandler outputhandler errorhandler uiloaded debuggerui canopensource lastexecfulltime uifinished
+expose  shutdown launched  breakpoints tracedprograms manualbreak windowname offsetdirection traceoutputhandler outputhandler errorhandler uiloaded debuggerui canopensource lastexecfulltime uifinished runroutine
 use arg windowname = "", offsetdirection = ""
 if windowname \= "" & offsetdirection = "" then offsetdirection = "R"
 shutdown = .False
@@ -142,6 +144,7 @@ debuggerui = .nil
 canopensource = .False
 lastexecfulltime = 0
 uifinished = .True
+runroutine = .nil
 
 .local~debug.channel = .Directory~new
 .debug.channel~status=.MutableBuffer~new("getprogramstatus", 256)
@@ -365,15 +368,15 @@ if translate(response) = 'CAPTURE' | translate(response) = 'CAPTUREX' then do
   if translate(response) = 'CAPTURE' then discardtrace = .False
   else  discardtrace = .True
   if self~CaptureConsoleOutput(discardtrace) then do
-    retstr = 'call SAY "Output redirected to the debugger if the program permits this."'
-    if discardtrace = .False then retstr = retstr||'.endofline||"CAPTUREX does the same but discards trace text."'
-    else retstr = retstr||'.endofline||"All trace apart from runtime error messages will be discarded."'
+    retstr = 'call SAY "'self~DebugMsgPrefix||'Output redirected to the debugger if the program permits this."'
+    if discardtrace = .False then retstr = retstr||'.endofline||"'self~DebugMsgPrefix||'CAPTUREX does the same but discards trace text."||.endofline'
+    else retstr = retstr||'.endofline||"'self~DebugMsgPrefix||'All trace apart from runtime error messages will be discarded."||.endofline'
     return retstr
   end  
 end
 if translate(response) = 'NOCAPTURE' then do
   self~StopCaptureConsoleOutput
-  return 'call SAY "If active, console redirection has been switched off."||.endofline||"Use CAPTURE/CAPTUREX to switch it back on."'
+  return 'call SAY "'self~DebugMsgPrefix||'If active, console redirection has been switched off."||.endofline||"'self~DebugMsgPrefix||'Use CAPTURE/CAPTUREX to switch it back on."||.endofline'
 end  
 if translate(response) = 'HELP' then do
   self~ShowHelpText
@@ -389,20 +392,21 @@ return response
 ------------------------------------------------------
 ::method GetAutoResponse unguarded
 ------------------------------------------------------
-expose debuggerui tracedprograms manualbreak breakpoints
+expose debuggerui tracedprograms manualbreak breakpoints runroutine
 
 status = .debug.channel~status~string
-.debug.channel~status~delete -- No setText method in 4.2
+
+.debug.channel~status~delete
 
 if status="breakpointcheckgetlocation" then do
-  return '_rxd_temp_res = .debug.channel~status~append("breakpointchecklocationis ".context~package~name">".context~line);  drop _rxd_temp_res'
+  return '_rexdeebugeer_tmp = .debug.channel~status~append("breakpointchecklocationis ".context~package~name">".context~line);  drop _rexdeebugeer_tmp'
   end
 else if status~pos("breakpointchecklocationis") = 1 then do
   parse value status with ignore codelocation -- Is this a breakpoint ?
   if breakpoints~hasindex(codelocation) then do  
     test = breakpoints[codelocation]
     if test = '' | manualbreak then do
-      manualbreak = .false
+      manualbreak = .False
       .debug.channel~status~append("getprogramstatus")
       return 'NOP'
     end  
@@ -419,7 +423,7 @@ else if status~pos("breakpointchecklocationis") = 1 then do
     return 'NOP'
   end
   else if manualbreak then do -- Was a break issued from the dialog? 
-    CALL SAY 'Automatic breakpoint hit.'
+    CALL SAY self~DebugMsgPrefix||'Automatic breakpoint hit.'
     manualbreak = .false
     .debug.channel~status~append("getprogramstatus")
     return 'NOP'
@@ -433,6 +437,7 @@ else if status~pos("breakpointprocesstestresult") = 1 then do
   testresult = .debug.channel~breakpointtestresult
   .debug.channel~breakpointtestresult = .False
   if testresult = .True then do
+     debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"Breakpoint condition is satisfied")
     .debug.channel~status~append("getprogramstatus")
     return 'NOP'
   end  
@@ -461,7 +466,7 @@ end
 else if status="programstatusupdated" then do
   if .debug.channel~frames \=.nil then do
     frames = .debug.channel~frames
-    frames = frames~section(1, frames~items-3)
+    if runroutine \= .nil then  frames = frames~section(1, frames~items-3)
     tracedprograms~put(frames~firstitem~executable~package~name)
     debuggerui~UpdateUICodeView(frames, 1)
   end  
@@ -503,28 +508,28 @@ return manualbreak
 ::method ShowHelptext 
 ------------------------------------------------------
 self~SendDebugMessage("")
-self~SendDebugMessage("- Commands: <instrs> | NEXT [<instrs>] | RUN | EXIT | HELP | CAPTURE | CAPTUREX | NOCAPTURE - use the Exec button to run the command.")
-self~SendDebugMessage("- Buttons with the above labels execute the corresponding command.")
-self~SendDebugMessage("- Command history for the session can be accessed with the up/down keys.")
-self~SendDebugMessage("- The Vars button opens a realtime variables window.")
-self~SendDebugMessage("- Double clicking many collection object types in a variables window will expand them in a new window.")
-self~SendDebugMessage("- Clicking a stack row takes you to the specified source location and file.")
-self~SendDebugMessage("- Double clicking a source row toggles a breakpoint, but this does not guarantee that the line will be hit.")
-self~SendDebugMessage("  Some simple hit checks are carried out but there is no detailed code analysis.")
-self~SendDebugMessage("  e.g. if it is empty, a comment, a directive or is END, THEN, ELSE, OTHERWISE, RETURN, EXIT or SIGNAL")
-self~SendDebugMessage("  DO statements should be hit unless they mark the start of a loop that has looped once already.")
-self~SendDebugMessage("  CALL statements (and what they call) may be hit, depending on what they are calling.")
-self~SendDebugMessage("  A * means the self thinks the code will be hit, a ? means it thinks it likely it won't ever be hit.")
-self~SendDebugMessage("  Hint: A line with just NOP can be inserted as an anchor for a breakpoint that will always be hit.")
-self~SendDebugMessage("- /**/ at the start of traceable line (including NOP) causes a breakpoint to be automatically set for that line.")
-self~SendDebugMessage("- The instruction CALL SAY ... will always send output here.")
-self~SendDebugMessage("- So long as SAY is enabled in the target application, other output should appear there.")
-self~SendDebugMessage("- If the application has no output, or you want the output here, you can try the CAPTURE command to capture all output.")
-self~SendDebugMessage("  CAPTUREX is similar but will discard (eXclude) all trace output apart from program errors.")
-self~SendDebugMessage("- NOCAPTURE switches off any capture that was previously active.")
-self~SendDebugMessage("- The source window and watch windows go grey while the program is running and after it has finished.")
-self~SendDebugMessage("Happy debugging!")
-
+self~SendDebugMessage(self~DebugMsgPrefix||"- Commands: <instrs> | NEXT [<instrs>] | RUN | EXIT | HELP | CAPTURE | CAPTUREX | NOCAPTURE - use the Exec button to run the command.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- Buttons with the above labels execute the corresponding command.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- Command history for the session can be accessed with the up/down keys.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- The Vars button opens a realtime variables window.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- Double clicking many collection object types in a variables window will expand them in a new window.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- Clicking a stack row takes you to the specified source location and file.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- Double clicking a source row toggles a breakpoint, but this does not guarantee that the line will be hit.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  Some simple hit checks are carried out but there is no detailed code analysis.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  e.g. if it is empty, a comment, a directive or is END, THEN, ELSE, OTHERWISE, RETURN, EXIT or SIGNAL")
+self~SendDebugMessage(self~DebugMsgPrefix||"  DO statements should be hit unless they mark the start of a loop that has looped once already.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  CALL statements (and what they call) may be hit, depending on what they are calling.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  A * means the self thinks the code will be hit, a ? means it thinks it likely it won't ever be hit.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  Hint: A line with just NOP can be inserted as an anchor for a breakpoint that will always be hit.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- /**/ at the start of traceable line (including NOP) causes a breakpoint to be automatically set for that line.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- The instruction CALL SAY ... will always send output here.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- So long as SAY is enabled in the target application, other output should appear there.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- If the application has no output, or you want the output here, you can try the CAPTURE command to capture all output.")
+self~SendDebugMessage(self~DebugMsgPrefix||"  CAPTUREX is similar but will discard (eXclude) all trace output apart from program errors.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- NOCAPTURE switches off any capture that was previously active.")
+self~SendDebugMessage(self~DebugMsgPrefix||"- The source window and watch windows go grey while the program is running, and the watch windows after it has finished.")
+self~SendDebugMessage(self~DebugMsgPrefix||"Happy debugging!")
+self~SendDebugMessage('')
 ------------------------------------------------------
 ::method GetCaption unguarded
 ------------------------------------------------------
@@ -534,7 +539,7 @@ return "ooRexx Debugger Version "||GetPackageConstant("Version")
 ------------------------------------------------------
 ::method OpenNewProgram unguarded
 ------------------------------------------------------
-expose debuggerui shutdown breakpoints tracedprograms canopensource traceoutputhandler
+expose debuggerui shutdown breakpoints tracedprograms canopensource traceoutputhandler runroutine
 
 use arg rexxfile,argstring,multipleargs = .False, firsttime = .False
 
@@ -558,9 +563,14 @@ else do
 
   if \firsttime then do
     debuggerui~AppendUIConsoleText("")
-    debuggerui~AppendUIConsoleText("New debug session started for "rexxfile)
+    debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"New debug session started for "rexxfile)
     debuggerui~AppendUIConsoleText("")
   end
+  else do
+    debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"Debug session started for "rexxfile)
+    debuggerui~AppendUIConsoleText("")
+  end
+
   self~canopensource = .False
   debuggerui~InitUISource(arrSource, rexxfile)
 
@@ -599,9 +609,14 @@ else do
   
   signal on ANY name HandleRuntimeError
   runroutine~callwith(runargs)
+  
   signal off ANY
   canopensource = .True
   debuggerui~UpdateUIControlStates
+
+  debuggerui~AppendUIConsoleText("")
+  debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"Debug session ended normally")
+
 end  
 
 return
@@ -617,19 +632,21 @@ if cond~CODE = 3.1 then do
   filename = cond~MESSAGE~substr(cond~MESSAGE~pos('"'), cond~MESSAGE~lastpos('"') - cond~MESSAGE~pos('"') + 1)
   if filename = '"&1"' then errorlist~append("Error: No Rexx program specified")
   else errorlist~append('Error: Rexx program 'filename' not found')
+  debuggerui~SetUISourceListInfoText(errorlist)
 end
 else do  
   strm = .stream~new(rexxfile)
   arrsource = strm~arrayin
   strm~close
-  errorlist~append('Error: Syntax error parsing 'rexxfile' at line 'sourceerrorline)
-  errorlist~append('')
-  if sourceerrorline \= 0 then errorlist~append(sourceerrorline~right(5)' *-* 'arrSource[sourceerrorline])
-  errorlist~append('')
-  errorlist~append('Error 'cond~RC' : 'cond~ERRORTEXT)
-  errorlist~append('Error 'cond~CODE': 'cond~MESSAGE)
+  self~SendDebugMessage(self~DebugMsgPrefix||'Error: Syntax error parsing 'rexxfile' at line 'sourceerrorline)
+  self~SendDebugMessage(self~DebugMsgPrefix)
+  if sourceerrorline \= 0 then self~SendDebugMessage(self~DebugMsgPrefix||sourceerrorline~right(5)' *-* 'arrSource[sourceerrorline])
+  self~SendDebugMessage(self~DebugMsgPrefix||'Error 'cond~RC' : 'cond~ERRORTEXT)
+  self~SendDebugMessage(self~DebugMsgPrefix||'Error 'cond~CODE': 'cond~MESSAGE)
+  self~SendDebugMessage('')  
+  self~SendDebugMessage(self~DebugMsgPrefix||"Debug session was aborted")
 end  
-debuggerui~SetUISourceListInfoText(errorlist)
+
 self~canopensource = .true
 debuggerui~UpdateUIControlStates
 return
@@ -637,14 +654,17 @@ return
 ------------
 HandleRuntimeError: 
 ------------
-self~SendDebugMessage('Runtime error:')   
+self~SendDebugMessage(self~DebugMsgPrefix||'Runtime error:')   
 cond = .context~condition
 do lineidx = 0 to cond~Traceback~items -1
   if cond~Traceback[lineidx]~pos('runroutine~callwith(runargs)') \= 0 then leave
-  self~SendDebugMessage(cond~Traceback[lineidx])
+  self~SendDebugMessage(self~DebugMsgPrefix||cond~Traceback[lineidx])
 end    
-self~SendDebugMessage('Error 'cond~RC' running 'cond~package~name' line 'cond~Position': 'cond~ErrorText)   
-self~SendDebugMessage('Error 'cond~code': 'cond~message)
+self~SendDebugMessage(self~DebugMsgPrefix||'Error 'cond~RC' running 'cond~package~name' line 'cond~Position': 'cond~ErrorText)   
+self~SendDebugMessage(self~DebugMsgPrefix||'Error 'cond~code': 'cond~message)
+self~SendDebugMessage("")  
+self~SendDebugMessage(self~DebugMsgPrefix||"Debug session was aborted")
+  
 
 self~canopensource = .true
 debuggerui~UpdateUIControlStates
@@ -800,8 +820,8 @@ if \capture | debugger~isshutdown then forward to (originaltraceoutput)
 
 if canusetraceobjects then tracestring = tracestring~makestring
 
-if \discard | tracestring~pos('+++ Interactive trace.  Error') = 1  then debugger~SendDebugMessage(tracestring)
-else if dononwrappedchecks , tracestring~pos('Error') = 1, tracestring~word(2)~strip('T',':')~datatype='NUM' then debugger~SendDebugMessage(tracestring)
+if \discard | tracestring~pos('+++ Interactive trace.  Error') = 1  then debugger~SendDebugMessage(debugger~DebugMsgPrefix||tracestring)
+else if dononwrappedchecks , tracestring~pos('Error') = 1, tracestring~word(2)~strip('T',':')~datatype='NUM' then debugger~SendDebugMessage(debugger~DebugMsgPrefix||tracestring)
 
 return 0
 

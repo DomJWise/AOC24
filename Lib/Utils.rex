@@ -13,6 +13,25 @@ strm~close
 
 return arrLines
 
+::ROUTINE GetGcd public
+use arg num1,num2
+finished = .False
+gcd = 1
+do while \finished
+  do i = 2 to MIN(num1, num2)
+    num1 = num1~abs
+    num2 = num2~abs
+    if num1 // i = 0 & num2 // i = 0 then do 
+      gcd = gcd * i
+      num1 = num1 / i
+      num2 = num2 / i
+      leave
+    end  
+  end
+  if i >  MIN(num1, num2) then finished = .True
+end
+return gcd
+
 ::class Point public
   ::attribute x
   ::attribute y
