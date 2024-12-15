@@ -40,7 +40,7 @@ if .local~rexxdebugger.startuphelptext = .nil then do
   "CALL RexxDebugger [parentwindowtitle, offset(UDL*R*)]", -
   "", - 
   "Below this add the following to start debugging:", -
-  "TRACE ?A", - 
+  "TRACE ?A", -
   "", -
   "Source code will be shown when debugging is started.", -
   "To select a program to debug now, click the Open button.", -
@@ -560,7 +560,8 @@ else do
   strm~close
   if arrSource~items = 0 then arrSource = .array~of('')
   if arrSource[1]~strip~left(2) = '#!' then arrSource[1] = arrSource[1]~insert('-- /*REXX.DEBUGGER.COMMENTOUT*/ ')
-  arrSource~~append('')~append('/*REXX.DEBUGGER.INJECT*/ ::OPTIONS TRACE ?R')
+  if .TraceObject~class = .Object~Class then .traceobject~option = 'P'
+  arrSource~~append('')~append('/*REXX.DEBUGGER.INJECT*/ ::OPTIONS TRACE ?A')
 
   if \firsttime then do
     debuggerui~AppendUIConsoleText("")
