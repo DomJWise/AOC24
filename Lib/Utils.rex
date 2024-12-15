@@ -61,3 +61,14 @@ return gcd
   ::method makestring
     expose x y
     return x y
+
+  ::method equals
+    expose x y
+    use arg other
+    return x = other~x & y = other~y
+    
+  ::method copyfrom
+  expose x y
+  use arg other
+  x = other~x
+  y = other~y
