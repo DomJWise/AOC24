@@ -40,7 +40,7 @@ if .local~rexxdebugger.startuphelptext = .nil then do
   "CALL RexxDebugger [parentwindowtitle, offset(UDL*R*)]", -
   "", - 
   "Below this add the following to start debugging:", -
-  "TRACE ?R ", - 
+  "TRACE ?A", - 
   "", -
   "Source code will be shown when debugging is started.", -
   "To select a program to debug now, click the Open button.", -
@@ -84,7 +84,7 @@ if .local~rexxdebugger.commandlineisrexxdebugger then .local~rexxdebugger.debugg
 The core code of the debugging library follows below
 ====================================================*/
 
-::CONSTANT VERSION "1.32.9"
+::CONSTANT VERSION "1.33"
 
 --====================================================
 ::class RexxDebugger public
@@ -396,7 +396,7 @@ expose debuggerui tracedprograms manualbreak breakpoints runroutine
 
 status = .debug.channel~status~string
 
-.debug.channel~status~delete
+.debug.channel~status~delete(1)
 
 if status="breakpointcheckgetlocation" then do
   return '_rexdeebugeer_tmp = .debug.channel~status~append("breakpointchecklocationis ".context~package~name">".context~line);  drop _rexdeebugeer_tmp'
@@ -406,6 +406,7 @@ else if status~pos("breakpointchecklocationis") = 1 then do
   if breakpoints~hasindex(codelocation) then do  
     test = breakpoints[codelocation]
     if test = '' | manualbreak then do
+      if manualbreak then CALL SAY self~DebugMsgPrefix||'Automatic breakpoint hit.'
       manualbreak = .False
       .debug.channel~status~append("getprogramstatus")
       return 'NOP'
@@ -547,7 +548,7 @@ shutdown = .False
 breakpoints~empty
 tracedprograms~empty
 if traceoutputhandler \= .nil then traceoutputhandler~dononwrappedchecks = .False
-.debug.channel~status~delete 
+.debug.channel~status~delete(1) 
 .debug.channel~status~append("getprogramstatus")
 runroutine = .nil
 strm = .stream~new(rexxfile)
@@ -606,17 +607,19 @@ else do
     end  
   end  
 
-  
   signal on ANY name HandleRuntimeError
+  DROP RESULT
   runroutine~callwith(runargs)
-  
   signal off ANY
+  
+  proghasresult = .True
+  if Symbol('RESULT') \= 'VAR' then proghasresult = .False; else progresult = RESULT
+  
   canopensource = .True
   debuggerui~UpdateUIControlStates
-
   debuggerui~AppendUIConsoleText("")
   debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"Debug session ended normally")
-
+  if proghasresult then debuggerui~AppendUIConsoleText(self~DebugMsgPrefix||"Program returned : "progresult~string)
 end  
 
 return

@@ -799,7 +799,7 @@ controls[self~LISTSOURCE]~hidefast
 if arrstack[activateindex]~executable~source \= .Nil, arrstack[activateindex]~executable~source~items \= 0 then do 
   thissourcename = arrstack[activateindex]~executable~package~name
   if thissourcename \= activesourcename then do
-    if activesourcename \= .nil then debugger~SendDebugMessage('Switching source to 'thissourcename)
+    if activesourcename \= .nil then self~appendtext(debugger~DebugMsgPrefix||'Switching source to 'thissourcename)
     activesourcename = thissourcename
     self~SetListSource(thissourcename)
     self~UpdateControlStates
@@ -895,6 +895,12 @@ activesourcename=.nil
 ::CONSTANT ROOTCOLLECTIONNAME ":Root"
 ::CONSTANT MAXVALUESTRINGLENGTH 255
 
+::ATTRIBUTE hfnt                 unguarded
+::ATTRIBUTE parentlist           unguarded
+::ATTRIBUTE itemidentifiers      unguarded
+::ATTRIBUTE itemclasses          unguarded
+::ATTRIBUTE currentselectioninfo unguarded
+::ATTRIBUTE varsvalid            unguarded
 
  ------------------------------------------------------
 ::method init 
@@ -991,49 +997,48 @@ end
  
 
 ------------------------------------------------------
-::METHOD UpdateWatchWindow
+::METHOD UpdateWatchWindow unguarded
 ------------------------------------------------------
-expose controls parentlist  hfnt itemidentifiers itemclasses currentselectioninfo varsvalid
+expose controls
 use arg root
 
 variablescollection = root
-if parentlist~items \= 0 then do
+if self~parentlist~items \= 0 then do
   variablescollection~put(.environment, ".ENVIRONMENT")
   variablescollection~put(.local, ".LOCAL")
 end
-do nextchild over parentlist
+do nextchild over self~parentlist
   variablescollection = variablescollection[nextchild]
   if variablescollection = .nil then leave
 end
 if variablescollection = .nil then do
   self~ListClearSelection(controls, self~LISTVARS)
-  varsvalid = .False
+  self~varsvalid = .False
 end
 else do
-  varsvalid = .True
-  controls[self~LISTVARS]~hidefast
+  self~varsvalid = .True
+  self~ControlWinUIDeferRedraw(controls, self~LISTVARS, .True)
+  
   self~ListDeleteAllItems(controls, self~LISTVARS)
-  dc = self~getControlDC(self~LISTVARS)
-  oldfont = self~fonttodc(dc, hfnt)
+  self~ListWinUIBeginSetHorizonalExtent(self~LISTVARS)
 
-  maxwidth = 0
   dosort = .False
   if variablescollection~isA(.Directory) | -
        variablescollection~isA(.Properties) | -
        variablescollection~isA(.Stem) -
   then  dosort = .True
   if .StringTable~class~defaultname = .class~defaultname, variablescollection~isA(.StringTable) then dosort = .True
-  if dosort then itemidentifiers = variablescollection~allindexes~sort
-  else  itemidentifiers = variablescollection~allindexes
-  if parentlist~items = 0 then do
+  if dosort then self~itemidentifiers = variablescollection~allindexes~sort
+  else  self~itemidentifiers = variablescollection~allindexes
+  if self~parentlist~items = 0 then do
     variablescollection~put(.environment, ".ENVIRONMENT")
-    itemidentifiers~append(".ENVIRONMENT")
+    self~itemidentifiers~append(".ENVIRONMENT")
     variablescollection~put(.local, ".LOCAL")
-    itemidentifiers~append(".LOCAL")
+    self~itemidentifiers~append(".LOCAL")
   end
 
-  itemclasses = .Array~new
-  do varname over itemidentifiers
+  self~itemclasses = .Array~new
+  do varname over self~itemidentifiers
     if varname~isA(.Array) then vardisplayname = varname~makestring(,",")
     else vardisplayname = varname
     varvalue = variablescollection[varname]~defaultname
@@ -1048,21 +1053,18 @@ else do
     if self~IsExpandable(variablescollection[varname]~class) then text = '+'
     else text = ' '
     text= text||vardisplayname' = 'varvalue
-    width = self~getTextExtent(dc, text)~width
-    if width > maxwidth then maxwidth = width
-      self~ListAddItem(controls, self~LISTVARS, text)
-    itemclasses~append(variablescollection[varname]~class)
+    self~ListWinUIUpdateMaxHorizonalExtent(text)
+    self~ListAddItem(controls, self~LISTVARS, text)
+    self~itemclasses~append(variablescollection[varname]~class)
   end
 
-  self~fonttodc(dc, oldfont)
-  self~freecontroldc(self~LISTVARS, oldfont)
-  self~setListWidthpx(self~LISTVARS, maxwidth)
+  self~ListWinUIEndSetHorizonalExtent(self~LISTVARS)
 
-  parse value currentselectioninfo with prevrowsbefore':'prevselectedidentifierstring
-  if currentselectioninfo \= "" then do 
+  parse value self~currentselectioninfo with prevrowsbefore':'prevselectedidentifierstring
+  if self~currentselectioninfo \= "" then do 
     indextoselect = 0
-    if prevselectedidentifierstring \= "" then do i = 1 to itemidentifiers~items
-      if itemidentifiers[i]~makestring = prevselectedidentifierstring then do
+    if prevselectedidentifierstring \= "" then do i = 1 to self~itemidentifiers~items
+      if self~itemidentifiers[i]~makestring = prevselectedidentifierstring then do
         indextoselect = i
         leave
       end
@@ -1074,8 +1076,7 @@ else do
     end  
     else if self~ListGetRowCount(controls, self~LISTVARS) \= 0 then self~ListSetFirstVisible(controls, self~LISTVARS, 1)
   end  
-  controls[self~LISTVARS]~showfast
-  controls[self~LISTVARS]~redraw
+  self~ControlWinUIDeferRedraw(controls, self~LISTVARS, .False)
  
 end
 
@@ -1421,6 +1422,36 @@ use arg controls, listid, itemindex, text
 
 controls[listid]~modify(itemindex, text)
 
+
+------------------------------------------------------
+::method ListWinUIBeginSetHorizonalExtent
+------------------------------------------------------
+expose dc oldfont maxwidth
+use arg listid
+
+dc = self~getControlDC(listid)
+oldfont = self~fonttodc(dc, self~hfnt)
+maxwidth = 0
+
+------------------------------------------------------
+::method ListWinUIUpdateMaxHorizonalExtent
+------------------------------------------------------
+expose dc maxwidth
+use arg text
+
+width = self~getTextExtent(dc, text)~width
+if width > maxwidth then maxwidth = width
+
+------------------------------------------------------
+::method ListWinUIEndSetHorizonalExtent
+------------------------------------------------------
+expose dc oldfont maxwidth
+use arg listid
+
+self~fonttodc(dc, oldfont)
+self~freecontroldc(listid, oldfont)
+self~setListWidthpx(listid, maxwidth)
+
 ------------------------------------------------------
 ::method ControlEnable
 ------------------------------------------------------
@@ -1428,6 +1459,17 @@ use arg controls, controlid, enable
 
 if enable then self~EnableControl(controlid)
 else self~DisableControl(controlid)
+
+------------------------------------------------------
+::method ControlWinUIDeferRedraw
+------------------------------------------------------
+use arg controls, controlid, defer
+if defer then controls[controlid]~hidefast
+else do
+  controls[controlid]~showfast
+  controls[controlid]~redraw
+end
+
 
 ------------------------------------------------------
 ::method ButtonSetText
