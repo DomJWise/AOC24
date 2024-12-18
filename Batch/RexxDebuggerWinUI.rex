@@ -671,7 +671,7 @@ if \debugger~isshutdown then do
     controls[self~EDITDEBUGLOG]~replaceseltext(newtext, .False)
     if newtext~pos(.endofline) \= 0 then scrollcharpos = newtext~left(newtext~length - .endofline~length)~lastpos(.endofline) + debugconsoletextlength + .endofline~length
     controls[self~EDITDEBUGLOG]~select(scrollcharpos,scrollcharpos)
-    controls[self~EDITDEBUGLOG]~scrollcommand("DOWN", 1)
+    if newtext~length + 1 - newtext~lastpos(.endofline) \= .endofline~length then controls[self~EDITDEBUGLOG]~scrollcommand("DOWN", 1)
     debugconsoletextlength = debugconsoletextlength + newtext~length
     controls[self~EDITDEBUGLOG]~showfast
     controls[self~EDITDEBUGLOG]~ensureCaretVisibility
