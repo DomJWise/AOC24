@@ -902,6 +902,7 @@ activesourcename=.nil
 ::ATTRIBUTE itemclasses          unguarded
 ::ATTRIBUTE currentselectioninfo unguarded
 ::ATTRIBUTE varsvalid            unguarded
+::ATTRIBUTE controls             unguarded
 
  ------------------------------------------------------
 ::method init 
@@ -996,90 +997,6 @@ if itemindex \= 0 then do
   currentselectioninfo = rowsbefore':'selectedidentifierstring
 end  
  
-
-------------------------------------------------------
-::METHOD UpdateWatchWindow unguarded
-------------------------------------------------------
-expose controls
-use arg root
-
-variablescollection = root
-if self~parentlist~items \= 0 then do
-  variablescollection~put(.environment, ".ENVIRONMENT")
-  variablescollection~put(.local, ".LOCAL")
-end
-do nextchild over self~parentlist
-  variablescollection = variablescollection[nextchild]
-  if variablescollection = .nil then leave
-end
-if variablescollection = .nil then do
-  self~ListClearSelection(controls, self~LISTVARS)
-  self~varsvalid = .False
-end
-else do
-  self~varsvalid = .True
-  self~ControlWinUIDeferRedraw(controls, self~LISTVARS, .True)
-  
-  self~ListDeleteAllItems(controls, self~LISTVARS)
-  self~ListWinUIBeginSetHorizonalExtent(self~LISTVARS)
-
-  dosort = .False
-  if variablescollection~isA(.Directory) | -
-       variablescollection~isA(.Properties) | -
-       variablescollection~isA(.Stem) -
-  then  dosort = .True
-  if .StringTable~class~defaultname = .class~defaultname, variablescollection~isA(.StringTable) then dosort = .True
-  if dosort then self~itemidentifiers = variablescollection~allindexes~sort
-  else  self~itemidentifiers = variablescollection~allindexes
-  if self~parentlist~items = 0 then do
-    variablescollection~put(.environment, ".ENVIRONMENT")
-    self~itemidentifiers~append(".ENVIRONMENT")
-    variablescollection~put(.local, ".LOCAL")
-    self~itemidentifiers~append(".LOCAL")
-  end
-
-  self~itemclasses = .Array~new
-  do varname over self~itemidentifiers
-    if varname~isA(.Array) then vardisplayname = varname~makestring(,",")
-    else vardisplayname = varname
-    varvalue = variablescollection[varname]~defaultname
-    if variablescollection[varname]~isA(.string) then
-    varvalue = variablescollection[varname]~changestr(.endofline, '<EOL>')~changestr(d2c(13), '<CR>')~changestr(d2c(10), '<LF>')
-    if varvalue~length > self~MAXVALUESTRINGLENGTH then varvalue = varvalue~left(self~MAXVALUESTRINGLENGTH)||'...'
-    if variablescollection[varname]~isInstanceOf(.Collection) then do
-      varvalue = varvalue' ('variablescollection[varname]~items' item'
-      if variablescollection[varname]~items \=1 then varvalue=varvalue||'s'
-      varvalue = varvalue||')'
-    end  
-    if self~IsExpandable(variablescollection[varname]~class) then text = '+'
-    else text = ' '
-    text= text||vardisplayname' = 'varvalue
-    self~ListWinUIUpdateMaxHorizonalExtent(text)
-    self~ListAddItem(controls, self~LISTVARS, text)
-    self~itemclasses~append(variablescollection[varname]~class)
-  end
-
-  self~ListWinUIEndSetHorizonalExtent(self~LISTVARS)
-
-  parse value self~currentselectioninfo with prevrowsbefore':'prevselectedidentifierstring
-  if self~currentselectioninfo \= "" then do 
-    indextoselect = 0
-    if prevselectedidentifierstring \= "" then do i = 1 to self~itemidentifiers~items
-      if self~itemidentifiers[i]~makestring = prevselectedidentifierstring then do
-        indextoselect = i
-        leave
-      end
-    end    
-    if indextoselect \= 0 then do
-      self~ListSetSelectedIndex(controls, self~LISTVARS, indextoselect)
-      newfirstvisible = MAX(1,indextoselect - prevrowsbefore)
-      self~ListSetFirstVisible(controls, self~LISTVARS, newfirstvisible)
-    end  
-    else if self~ListGetRowCount(controls, self~LISTVARS) \= 0 then self~ListSetFirstVisible(controls, self~LISTVARS, 1)
-  end  
-  self~ControlWinUIDeferRedraw(controls, self~LISTVARS, .False)
- 
-end
 
 ------------------------------------------------------
 ::method VariableDoubleClicked
@@ -1425,7 +1342,7 @@ controls[listid]~modify(itemindex, text)
 
 
 ------------------------------------------------------
-::method ListWinUIBeginSetHorizonalExtent
+::method ListBeginSetHorizonalExtent
 ------------------------------------------------------
 expose dc oldfont maxwidth
 use arg listid
@@ -1435,7 +1352,7 @@ oldfont = self~fonttodc(dc, self~hfnt)
 maxwidth = 0
 
 ------------------------------------------------------
-::method ListWinUIUpdateMaxHorizonalExtent
+::method ListUpdateMaxHorizonalExtent
 ------------------------------------------------------
 expose dc maxwidth
 use arg text
@@ -1444,7 +1361,7 @@ width = self~getTextExtent(dc, text)~width
 if width > maxwidth then maxwidth = width
 
 ------------------------------------------------------
-::method ListWinUIEndSetHorizonalExtent
+::method ListEndSetHorizonalExtent
 ------------------------------------------------------
 expose dc oldfont maxwidth
 use arg listid
@@ -1462,7 +1379,7 @@ if enable then self~EnableControl(controlid)
 else self~DisableControl(controlid)
 
 ------------------------------------------------------
-::method ControlWinUIDeferRedraw
+::method ControlDeferRedraw
 ------------------------------------------------------
 use arg controls, controlid, defer
 if defer then controls[controlid]~hidefast

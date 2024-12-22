@@ -895,6 +895,90 @@ return
 --====================================================
 
 ------------------------------------------------------
+::METHOD UpdateWatchWindow unguarded
+------------------------------------------------------
+use arg root
+
+variablescollection = root
+if self~parentlist~items \= 0 then do
+  variablescollection~put(.environment, ".ENVIRONMENT")
+  variablescollection~put(.local, ".LOCAL")
+end
+do nextchild over self~parentlist
+  variablescollection = variablescollection[nextchild]
+  if variablescollection = .nil then leave
+end
+if variablescollection = .nil then do
+  self~ListClearSelection(self~controls, self~LISTVARS)
+  self~varsvalid = .False
+end
+else do
+  self~varsvalid = .True
+  self~ControlDeferRedraw(self~controls, self~LISTVARS, .True)
+  
+  self~ListDeleteAllItems(self~controls, self~LISTVARS)
+  self~ListBeginSetHorizonalExtent(self~LISTVARS)
+
+  dosort = .False
+  if variablescollection~isA(.Directory) | -
+       variablescollection~isA(.Properties) | -
+       variablescollection~isA(.Stem) -
+  then  dosort = .True
+  if .StringTable~class~defaultname = .class~defaultname, variablescollection~isA(.StringTable) then dosort = .True
+  if dosort then self~itemidentifiers = variablescollection~allindexes~sort
+  else  self~itemidentifiers = variablescollection~allindexes
+  if self~parentlist~items = 0 then do
+    variablescollection~put(.environment, ".ENVIRONMENT")
+    self~itemidentifiers~append(".ENVIRONMENT")
+    variablescollection~put(.local, ".LOCAL")
+    self~itemidentifiers~append(".LOCAL")
+  end
+
+  self~itemclasses = .Array~new
+  do varname over self~itemidentifiers
+    if varname~isA(.Array) then vardisplayname = varname~makestring(,",")
+    else vardisplayname = varname
+    varvalue = variablescollection[varname]~defaultname
+    if variablescollection[varname]~isA(.string) then
+    varvalue = variablescollection[varname]~changestr(.endofline, '<EOL>')~changestr(d2c(13), '<CR>')~changestr(d2c(10), '<LF>')
+    if varvalue~length > self~MAXVALUESTRINGLENGTH then varvalue = varvalue~left(self~MAXVALUESTRINGLENGTH)||'...'
+    if variablescollection[varname]~isInstanceOf(.Collection) then do
+      varvalue = varvalue' ('variablescollection[varname]~items' item'
+      if variablescollection[varname]~items \=1 then varvalue=varvalue||'s'
+      varvalue = varvalue||')'
+    end  
+    if self~IsExpandable(variablescollection[varname]~class) then text = '+'
+    else text = ' '
+    text= text||vardisplayname' = 'varvalue
+    self~ListUpdateMaxHorizonalExtent(text)
+    self~ListAddItem(self~controls, self~LISTVARS, text)
+    self~itemclasses~append(variablescollection[varname]~class)
+  end
+
+  self~ListEndSetHorizonalExtent(self~LISTVARS)
+
+  parse value self~currentselectioninfo with prevrowsbefore':'prevselectedidentifierstring
+  if self~currentselectioninfo \= "" then do 
+    indextoselect = 0
+    if prevselectedidentifierstring \= "" then do i = 1 to self~itemidentifiers~items
+      if self~itemidentifiers[i]~makestring = prevselectedidentifierstring then do
+        indextoselect = i
+        leave
+      end
+    end    
+    if indextoselect \= 0 then do
+      self~ListSetSelectedIndex(self~controls, self~LISTVARS, indextoselect)
+      newfirstvisible = MAX(1,indextoselect - prevrowsbefore)
+      self~ListSetFirstVisible(self~controls, self~LISTVARS, newfirstvisible)
+    end  
+    else if self~ListGetRowCount(self~controls, self~LISTVARS) \= 0 then self~ListSetFirstVisible(self~controls, self~LISTVARS, 1)
+  end  
+  self~ControlDeferRedraw(self~controls, self~LISTVARS, .False)
+ 
+end
+
+
+------------------------------------------------------
 ::method IsExpandable
 ------------------------------------------------------
 use arg itemclass
