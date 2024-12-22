@@ -903,6 +903,7 @@ activesourcename=.nil
 ::ATTRIBUTE currentselectioninfo unguarded
 ::ATTRIBUTE varsvalid            unguarded
 ::ATTRIBUTE controls             unguarded
+::ATTRIBUTE debugwindow          unguarded
 
  ------------------------------------------------------
 ::method init 
@@ -916,13 +917,7 @@ currentselectioninfo = ""
 varsvalid = .False
 forward class (super) continue array(.nil)
 
-dialogtitle = ''
-do elementname over parentlist
-  if dialogtitle \= '' then dialogtitle = ' @ '||dialogtitle
-  if elementname~isA(.Array) then dialogtitle = elementname~makestring(,",")||dialogtitle
-  else dialogtitle = elementname||dialogtitle 
-end
-dialogtitle = "Watch "||dialogtitle
+dialogtitle = self~GetDialogTitle
 
 self~create(0, 0, 180, 73, dialogtitle, "THICKFRAME")
 
@@ -984,42 +979,6 @@ expose hfnt debugwindow
 self~deletefont(hfnt)
 debugwindow~RemoveWatchWindow(self)
 self~CANCEL:super
-
-------------------------------------------------------
-::METHOD VariableSelected
-------------------------------------------------------
-expose controls itemidentifiers currentselectioninfo
-
-itemindex = self~ListGetSelectedIndex(controls, self~LISTVARS)
-if itemindex \= 0 then do
-  selectedidentifierstring = itemidentifiers[itemindex]~makestring
-  rowsbefore = itemindex - self~ListGetFirstVisible(controls, self~LISTVARS)
-  currentselectioninfo = rowsbefore':'selectedidentifierstring
-end  
- 
-
-------------------------------------------------------
-::method VariableDoubleClicked
-------------------------------------------------------
-expose controls debugwindow itemidentifiers itemclasses parentlist
-
-itemindex = self~ListGetSelectedIndex(controls, self~LISTVARS)
-if itemindex \= 0 then do
-  itemidentifier = itemidentifiers[itemindex]
-  if self~IsExpandable(itemclasses[itemindex]) then do
-    if parentlist~items \= 0 then newlist =parentlist~section(0)
-    else newlist = .List~new
-    newlist~append(itemidentifier)
-    debugwindow~AddWatchWindow(self, newlist)
-  end
-end  
-------------------------------------------------------
-::method SetListState
-------------------------------------------------------
-expose controls varsvalid
-use arg enablelist
-
-self~ControlEnable(controls, self~LISTVARS, enablelist & varsvalid)
 
 ------------------------------------------------------
 ::method OnCopyCommand unguarded

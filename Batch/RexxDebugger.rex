@@ -895,6 +895,49 @@ return
 --====================================================
 
 ------------------------------------------------------
+::METHOD VariableSelected
+------------------------------------------------------
+itemindex = self~ListGetSelectedIndex(self~controls, self~LISTVARS)
+if itemindex \= 0 then do
+  selectedidentifierstring = self~itemidentifiers[itemindex]~makestring
+  rowsbefore = itemindex - self~ListGetFirstVisible(self~controls, self~LISTVARS)
+  self~currentselectioninfo = rowsbefore':'selectedidentifierstring
+end  
+
+------------------------------------------------------
+::method VariableDoubleClicked
+------------------------------------------------------
+itemindex = self~ListGetSelectedIndex(self~controls, self~LISTVARS)
+if itemindex \= 0 then do
+  itemidentifier = self~itemidentifiers[itemindex]
+  if self~IsExpandable(self~itemclasses[itemindex]) then do
+    if self~parentlist~items \= 0 then newlist = self~parentlist~section(0)
+    else newlist = .List~new
+    newlist~append(itemidentifier)
+    self~debugwindow~AddWatchWindow(self, newlist)
+  end
+end
+
+------------------------------------------------------
+::method SetListState unguarded
+------------------------------------------------------
+use arg enablelist
+self~ControlEnable(self~controls, self~LISTVARS, enablelist & self~varsvalid)
+
+------------------------------------------------------
+::method GetDialogTitle unguarded
+------------------------------------------------------
+dialogtitle = ''
+do elementname over self~parentlist
+  if dialogtitle \= '' then dialogtitle = ' @ '||dialogtitle
+  if elementname~isA(.Array) then dialogtitle = elementname~makestring(,",")||dialogtitle
+  else dialogtitle = elementname||dialogtitle 
+end
+dialogtitle = "Watch "||dialogtitle
+
+return dialogTitle
+
+------------------------------------------------------
 ::METHOD UpdateWatchWindow unguarded
 ------------------------------------------------------
 use arg root
