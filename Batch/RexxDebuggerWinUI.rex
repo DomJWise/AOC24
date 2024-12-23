@@ -896,14 +896,14 @@ activesourcename=.nil
 ::CONSTANT ROOTCOLLECTIONNAME ":Root"
 ::CONSTANT MAXVALUESTRINGLENGTH 255
 
-::ATTRIBUTE hfnt                 unguarded
-::ATTRIBUTE parentlist           unguarded
-::ATTRIBUTE itemidentifiers      unguarded
-::ATTRIBUTE itemclasses          unguarded
-::ATTRIBUTE currentselectioninfo unguarded
-::ATTRIBUTE varsvalid            unguarded
-::ATTRIBUTE controls             unguarded
-::ATTRIBUTE debugwindow          unguarded
+::ATTRIBUTE hfnt                 private unguarded
+::ATTRIBUTE parentlist           private unguarded
+::ATTRIBUTE itemidentifiers      private unguarded
+::ATTRIBUTE itemclasses          private unguarded
+::ATTRIBUTE currentselectioninfo private unguarded
+::ATTRIBUTE varsvalid            private unguarded
+::ATTRIBUTE controls             private unguarded
+::ATTRIBUTE debugwindow          private unguarded
 
  ------------------------------------------------------
 ::method init 

@@ -1281,13 +1281,13 @@ end
 ::CONSTANT ROOTCOLLECTIONNAME ":Root"
 ::CONSTANT MAXVALUESTRINGLENGTH 255
 
-::ATTRIBUTE parentlist           unguarded
-::ATTRIBUTE itemidentifiers      unguarded
-::ATTRIBUTE itemclasses          unguarded
-::ATTRIBUTE currentselectioninfo unguarded
-::ATTRIBUTE varsvalid            unguarded
-::ATTRIBUTE controls             unguarded
-::ATTRIBUTE debugwindow          unguarded
+::ATTRIBUTE parentlist           private unguarded
+::ATTRIBUTE itemidentifiers      private unguarded
+::ATTRIBUTE itemclasses          private unguarded
+::ATTRIBUTE currentselectioninfo private unguarded
+::ATTRIBUTE varsvalid            private unguarded
+::ATTRIBUTE controls             private unguarded
+::ATTRIBUTE debugwindow          private unguarded
 
 ------------------------------------------------------
 ::method activate class
